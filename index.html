@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Sinus Mixer</title>
+
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #111;
+        color: white;
+        padding: 20px;
+      }
+
+      h1 {
+        margin-bottom: 10px;
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      input {
+        padding: 10px;
+        font-size: 16px;
+        width: 180px;
+        border-radius: 8px;
+        border: none;
+      }
+
+      button {
+        padding: 10px 14px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+      }
+
+      li {
+        background: #222;
+        margin-bottom: 10px;
+        padding: 12px;
+        border-radius: 10px;
+
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .freq {
+        font-size: 18px;
+      }
+
+      .remove {
+        background: #ff4444;
+        color: white;
+      }
+
+      .actions {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+      }
+
+      canvas {
+        width: 100%;
+        height: 250px;
+        background: black;
+        border-radius: 12px;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Interaktiver Sinus Mixer</h1>
+
+    <div class="controls">
+      <input type="number" id="freqInput" placeholder="Frequenz in Hz" />
+
+      <button id="addBtn">＋ Hinzufügen</button>
+    </div>
+
+    <ul id="freqList"></ul>
+
+    <div class="actions">
+      <button id="playBtn">▶ Abspielen</button>
+      <button id="stopBtn">■ Stop</button>
+    </div>
+
+    <canvas id="scope" width="1000" height="250"></canvas>
+
+    <script>
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+
+      const audioContext = new AudioContextClass();
+
+      const freqInput = document.getElementById("freqInput");
+      const freqList = document.getElementById("freqList");
+
+      const canvas = document.getElementById("scope");
+      const ctx = canvas.getContext("2d");
+
+      let oscillators = [];
+      let gains = [];
+
+      // Startwerte
+      let frequencies = [440, 660, 880];
+
+      function renderList() {
+        freqList.innerHTML = "";
+
+        frequencies.forEach((freq, index) => {
+          const li = document.createElement("li");
+
+          li.innerHTML = `
+            <span class="freq">${freq} Hz</span>
+
+            <button
+                class="remove"
+                onclick="removeFrequency(${index})"
+            >
+                Entfernen
+            </button>
+        `;
+
+          freqList.appendChild(li);
+        });
+      }
+
+      function addFrequency() {
+        const value = Number(freqInput.value);
+
+        if (!value || value <= 0) {
+          alert("Bitte gültige Frequenz eingeben");
+          return;
+        }
+
+        frequencies.push(value);
+
+        freqInput.value = "";
+
+        renderList();
+        playSound();
+      }
+
+      function removeFrequency(index) {
+        frequencies.splice(index, 1);
+
+        renderList();
+      }
+
+      function playSound() {
+        stopSound();
+
+        const masterGain = audioContext.createGain();
+
+        // Lautstärke automatisch anpassen
+        masterGain.gain.value = 0.2 / Math.max(1, frequencies.length);
+
+        masterGain.connect(audioContext.destination);
+
+        frequencies.forEach((freq) => {
+          const osc = audioContext.createOscillator();
+
+          osc.type = "sine";
+
+          osc.frequency.value = freq;
+
+          osc.connect(masterGain);
+
+          osc.start();
+
+          oscillators.push(osc);
+          gains.push(masterGain);
+        });
+
+        drawWave();
+      }
+
+      function stopSound() {
+        oscillators.forEach((osc) => {
+          try {
+            osc.stop();
+          } catch {}
+        });
+
+        oscillators = [];
+        gains = [];
+      }
+
+      function drawWave() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.beginPath();
+
+        for (let x = 0; x < canvas.width; x++) {
+          const t = (x / canvas.width) * 0.02;
+
+          let y = 0;
+
+          frequencies.forEach((freq) => {
+            y += Math.sin(2 * Math.PI * freq * t);
+          });
+
+          y /= Math.max(1, frequencies.length);
+
+          const drawY = canvas.height / 2 - y * canvas.height * 0.4;
+
+          if (x === 0) {
+            ctx.moveTo(x, drawY);
+          } else {
+            ctx.lineTo(x, drawY);
+          }
+        }
+
+        ctx.strokeStyle = "#00ff88";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      document.getElementById("addBtn").addEventListener("click", addFrequency);
+
+      document.getElementById("playBtn").addEventListener("click", playSound);
+
+      document.getElementById("stopBtn").addEventListener("click", stopSound);
+
+      renderList();
+    </script>
+  </body>
+</html>
